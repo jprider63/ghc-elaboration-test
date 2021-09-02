@@ -6,6 +6,7 @@
 module Test.Plugin where
 
 import           GHC
+import           CoreTidy
 import           Control.Monad.State
 import           TcType
 import           Class
@@ -13,7 +14,7 @@ import           TcEvidence
 import           GhcPlugins              hiding ( getHscEnv )
 import           DsBinds
 import qualified Data.Map.Strict               as OM
-import           OccName
+-- import           OccName
 import           DsExpr
 import           FastString
 -- import           HsPat
@@ -89,9 +90,12 @@ elabRnExpr mode rdr_expr = do
                                             lie
     evbs' <- perhaps_disable_default_warnings $ simplifyInteractive residual
     full_expr <- zonkTopLExpr (mkHsDictLet (EvBinds evbs') (mkHsDictLet evbs tc_expr))
-    initDsTc $ dsLExpr full_expr
+    globaliseExpr <$> initDsTc (dsLExpr full_expr)
  where
   (inst, infer_mode, perhaps_disable_default_warnings) = case mode of
     TM_Inst    -> (True, NoRestrictions, id)
     TM_NoInst  -> (False, NoRestrictions, id)
     TM_Default -> (True, EagerDefaulting, unsetWOptM Opt_WarnTypeDefaults)
+
+globaliseExpr :: CoreExpr -> CoreExpr
+globaliseExpr = tidyExpr emptyTidyEnv
